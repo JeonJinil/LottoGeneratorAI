@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lotto_generator/constant/app_color.dart';
 
+import 'crawling_lotto.dart';
+
 class Lotto extends StatelessWidget {
   final Map<String, dynamic>? lottoData;
-  final VoidCallback? onDelete;
+  final List<LottoRankInfo>? rankInfoList; //
 
-  const Lotto({super.key, this.lottoData, this.onDelete});
+  const Lotto({super.key, this.lottoData, this.rankInfoList});
 
   @override
   Widget build(BuildContext context) {
@@ -15,88 +17,67 @@ class Lotto extends StatelessWidget {
       lottoNumbers.add(lottoData!['drwtNo$i'] as int);
     }
 
-    return GestureDetector(
-      onTap: () {
-        // 탭 시 상세보기 다이얼로그
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: Text('${lottoData!['drwNo']}회차 상세 정보'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('날짜: ${lottoData!['drwNoDate']}'),
-                    Text(
-                      '번호: ${lottoNumbers.join(', ')} + ${lottoData!['bnusNo']}',
-                    ),
-                    Text(
-                      '1등 당첨금: ${NumberFormat('#,###').format(lottoData!['firstWinamnt'])}원',
-                    ),
-                    Text('1등 당첨자 수: ${lottoData!['firstPrzwnerCo']}명'),
-                    Text(
-                      '홀: ${lottoNumbers.where((num) => num.isOdd).length}: ${lottoNumbers.where((num) => num.isEven).length} 짝',
-                    ),
-                    Text(
-                      '저 : ${lottoNumbers.where((num) => num <= 23).length}, 고 : ${lottoNumbers.where((num) => num > 23).length}',
-                    ),
-                    Text('고저차 : ${lottoNumbers[5] - lottoNumbers[0]}'),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('닫기'),
-                  ),
-                ],
-              ),
-        );
-      },
-      onLongPress: () {
-        // 길게 눌렀을 때
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('삭제 확인'),
-                content: const Text('이 회차 카드를 삭제하시겠습니까?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('아니오'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      if (onDelete != null) onDelete!();
-                    },
-                    child: const Text('예', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-              ),
-        );
-      },
-      child: Card(
-        color: lottoCardColor,
-        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Center(
-            child: Column(
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border.all(
+          color: Colors.grey,
+          width: 1.0,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children:[
+            Column(
               children: [
+                Container(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${lottoData!['drwNo']}회 ',
+
+                        style: TextStyle(
+                          color: Color(0xFF216AF3),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 30,
+                        ),
+                      ),
+                      Text(
+                        '당첨번호',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 30,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 Text(
-                  '${lottoData!['drwNo']}회차 (${lottoData!['drwNoDate'].toString()})',
+                  '(${lottoData!['drwNoDate'].toString()}일 추첨)',
                   style: const TextStyle(fontSize: 18),
                 ),
                 const SizedBox(height: 10),
                 _Middle(lottoData: lottoData, lottoNumbers: lottoNumbers),
                 const SizedBox(height: 20),
-                _Bottom(lottoData: lottoData),
+                Text(
+                  '총 판매금액: ${NumberFormat('#,###').format(lottoData!['totSellamnt'])}원',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
-          ),
+
+            const SizedBox(height: 10),
+            _Bottom(rankInfoList: rankInfoList),
+            const SizedBox(height: 10),
+          ],
         ),
       ),
     );
@@ -141,18 +122,54 @@ class _Middle extends StatelessWidget {
 }
 
 class _Bottom extends StatelessWidget {
-  final Map<String, dynamic>? lottoData;
+  final List<LottoRankInfo>? rankInfoList;
 
-  const _Bottom({required this.lottoData});
+  const _Bottom({super.key, this.rankInfoList});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+
+
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(1.2),
+        1: FlexColumnWidth(2),
+        2: FlexColumnWidth(2.2),
+      },
+      border: TableBorder.all(color: Colors.grey.shade300),
       children: [
-        Text(
-          '1등 당첨금: ${NumberFormat('#,###').format(lottoData!['firstWinamnt'])}원',
+        const TableRow(
+          decoration: BoxDecoration(color: Color(0xFFE0F2F1)),
+          children: [
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('순위', textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('당첨 복권수', textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('총 당첨금', textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-        Text('당첨자 수: ${lottoData!['firstPrzwnerCo']}명'),
+
+        ...rankInfoList!.map((r) =>
+            TableRow(
+              children: [
+                Padding(padding: const EdgeInsets.all(8),
+                    child: Text('${r.rank}', textAlign: TextAlign.end,)),
+                Padding(padding: const EdgeInsets.all(8),
+                    child: Text(r.winnerCount, textAlign: TextAlign.end,)),
+                Padding(padding: const EdgeInsets.all(8),
+                    child: Text(r.prizePerGame, textAlign: TextAlign.end)),
+              ],
+            )),
       ],
     );
   }

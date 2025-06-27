@@ -1,9 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+
+import 'package:lotto_generator/component/crawling_qr_data.dart';
 import 'package:lotto_generator/component/lotto_widget.dart';
 import 'package:lotto_generator/constant/app_color.dart';
+import 'package:lotto_generator/screen/qr_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../component/crawling_lotto.dart';
 
 class LottoScreen extends StatefulWidget {
   const LottoScreen({super.key});
@@ -13,9 +18,12 @@ class LottoScreen extends StatefulWidget {
 }
 
 class _LottoScreenState extends State<LottoScreen> {
-  List<Map<String, dynamic>> lottoDataList = [];
+  late List<LottoRankInfo> lottoRankInfo;
+  late Map<String, dynamic> lottoData;
+  late LottoResult lottoResult;
+
   bool isLoading = true;
-  int lastRound = 1177;
+  late int lastRound;
 
   @override
   void initState() {
@@ -25,9 +33,16 @@ class _LottoScreenState extends State<LottoScreen> {
 
   Future<void> fetch() async {
     try {
+      lastRound = (await fetchLatestRound())!;
+      final rankInfo = await fetchLottoRankDetails(lastRound);
       final data = await fetchLottoResult(lastRound);
+      String url = "https://m.dhlottery.co.kr/qr.do?method=winQr&v=0984q141820323543q111527313240m071012222533n000000000000n0000000000001423157549";
+      lottoResult = (await crawlLottoQR(url))!;
+      print(lottoResult);
+
       setState(() {
-        lottoDataList.add(data);
+        lottoRankInfo = rankInfo;
+        lottoData = data;
         isLoading = false;
       });
     } catch (e) {
@@ -50,12 +65,15 @@ class _LottoScreenState extends State<LottoScreen> {
               SizedBox(
                 height: 200,
                 child: CupertinoPicker(
-                  scrollController: FixedExtentScrollController(initialItem: selectedIndex),
+                  scrollController: FixedExtentScrollController(
+                    initialItem: selectedIndex,
+                  ),
                   itemExtent: 40,
                   onSelectedItemChanged: (index) {
                     selectedIndex = index;
                   },
-                  children: roundList.map((r) => Center(child: Text('$r회'))).toList(),
+                  children:
+                      roundList.map((r) => Center(child: Text('$r회'))).toList(),
                 ),
               ),
               const Divider(height: 1),
@@ -74,16 +92,16 @@ class _LottoScreenState extends State<LottoScreen> {
                         final selectedRound = roundList[selectedIndex];
                         final data = await fetchLottoResult(selectedRound);
                         setState(() {
-                          if (!lottoDataList.any((e) => e['drwNo'] == selectedRound)) {
-                            lottoDataList.add(data);
-                          }
+                          // if (!lottoDataList.any((e) => e['drwNo'] == selectedRound)) {
+                          //   lottoDataList.add(data);
+                          // }
                         });
                         Navigator.pop(context);
                       },
                     ),
-                  )
+                  ),
                 ],
-              )
+              ),
             ],
           ),
         );
@@ -94,25 +112,57 @@ class _LottoScreenState extends State<LottoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // backgroundColor: AppColor.background,
-      appBar: AppBar(
-        title: const Text('로또 당첨 번호 조회'),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-        children: lottoDataList.map((data) {
-          return Lotto(
-            key: ValueKey(data['drwNo']),
-            lottoData: data,
-            onDelete: () {
-              setState(() {
-                lottoDataList.removeWhere((e) => e['drwNo'] == data['drwNo']);
-              });
-            },
-          );
-        }).toList(),
-      ),
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                children: [
+                  Lotto(lottoData: lottoData, rankInfoList: lottoRankInfo),
+                  ElevatedButton(
+                    onPressed: () async {
+                      var status = await Permission.camera.status;
+
+                      if (status.isDenied || status.isRestricted || status.isPermanentlyDenied) {
+                        // 권한 요청
+                        status = await Permission.camera.request();
+                      }
+
+                      if (status.isGranted) {
+                        // 권한이 있을 경우 QR 스캐너 페이지로 이동
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const QRScannerPage(),
+                          ),
+                        );
+
+                        // if (result != null && result is String) {
+                        //   print("RESULT!~!");
+                        //   print(result);
+                        //
+                        //   Navigator.of(context).push(
+                        //     MaterialPageRoute(
+                        //       builder: (context) => Scaffold(
+                        //         appBar: AppBar(title: const Text('QR 스캔 결과')),
+                        //         body: Center(child: Text(result)),
+                        //       ),
+                        //     ),
+                        //   );
+                        //   // setState(() {
+                        //   //   scannedResult = result;
+                        //   // });
+                        // }
+                      } else {
+                        // ❌ 권한 거부됨
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('카메라 권한이 필요합니다.')),
+                        );
+                      }
+                    },
+                    child: const Text('qrView'),
+                  ),
+                ],
+              ),
+
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -124,14 +174,6 @@ class _LottoScreenState extends State<LottoScreen> {
       ),
     );
   }
-
-  Future<Map<String, dynamic>> fetchLottoResult(int round) async {
-    final url = Uri.parse('https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round');
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('로또 데이터를 불러올 수 없습니다');
-    }
-  }
 }
+
+

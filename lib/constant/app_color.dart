@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 final Color navigatorBarColor = Color(0xfd65d5cc);
-final Color lottoCardColor = Color(0x65D5CCFD);
+final Color lottoCardColor = Color(0x61D59CFD);
 
 final Color lottoYellow = Colors.yellow[700]!;  // 1-10
 final Color lottoBlue = Colors.blue[700]!;      // 11-20
