@@ -68,6 +68,7 @@ Future<List<LottoRankInfo>> fetchLottoRankDetails(int drawNumber) async {
   return [];
 }
 
+// url에서 최신 round를 가져온다
 Future<int?> fetchLatestRound() async {
   final url = 'https://www.dhlottery.co.kr/gameResult.do?method=byWin';
   final response = await http.get(Uri.parse(url));
@@ -94,6 +95,7 @@ Future<int?> fetchLatestRound() async {
   return null;
 }
 
+// round에 맞는 로또 데이터를 가져온다 (당첨 data만 존재)
 Future<Map<String, dynamic>> fetchLottoResult(int round) async {
   final url = Uri.parse('https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round');
   final response = await http.get(url);
